@@ -12,7 +12,8 @@ mainCRTStartup PROC
         mov byte ptr [ebx + 11], dl
         push ebx
 
-        mov eax, 77be9100h
+        ;mov eax,77be9100h
+        mov eax, 76bb9100h
         call eax ;loadlibraryA
 
         jmp shell_execute
@@ -22,7 +23,8 @@ mainCRTStartup PROC
         mov byte ptr [ebx + 13], dl
         push ebx
         push eax
-        mov eax, 77be5930h
+        ;mov eax, 77be5930h
+        mov eax, 76bb5930h 
         call eax ;GetProcAddress
 
         jmp calc
@@ -50,7 +52,8 @@ mainCRTStartup PROC
         xor edx, edx
 
         push edx
-        mov eax, 77bef380h
+        ;mov eax, 77bef380h
+        mov eax, 76bbf380h 
         call eax ;ExitProcess
 
     shell32_dll:
