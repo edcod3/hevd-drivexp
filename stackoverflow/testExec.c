@@ -26,7 +26,7 @@ int main()
     //Overflow Buffer in HEVD
     char payload[69];
 
-    //Fill with 'A' 
+    //Fill with 'A'
     memset(payload, 'A', sizeof(payload));
 
     //Send exploit to driver

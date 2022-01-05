@@ -23,14 +23,16 @@ _start:
     popad                       ; return to previous register state
 
     ;IDK, some kernel recovery stuff
-    xor eax, eax            ; set NTSTATUS SUCCESS
     ;xor esi, esi
     ;xor edi, edi
-    ;add esp, 0x10           ; Fix stack alignment
-    sub esp, 0x4
+    add esp, 0x2c           ; Fix stack alignment
+    ;sub esp, 0x4
     ;mov edx, 0x00010002     ; Idk, looks cool
     ;mov ebx, 0x0000010e     ; Idk, looks cool
+    xor eax, eax            ; set NTSTATUS SUCCESS
     mov ecx, eax
     mov eax, ecx
+    ;mov ebp, esp
+    ;add ebp, 0xc
     pop ebp                 ; restore stack base
     ret 8                   ; clean return
