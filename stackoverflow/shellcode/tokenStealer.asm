@@ -28,7 +28,9 @@ _start:
     add esp, 0x2c           ; Fix stack alignment
     ;sub esp, 0x4
     ;mov edx, 0x00010002     ; Idk, looks cool
-    ;mov ebx, 0x0000010e     ; Idk, looks cool
+    mov ebx, 0x00000103     ; Idk, looks cool
+    mov edx, [esp+0xf4]
+    shr edx, 0x4
     xor eax, eax            ; set NTSTATUS SUCCESS
     mov ecx, eax
     mov eax, ecx
