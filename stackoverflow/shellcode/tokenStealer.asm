@@ -25,16 +25,21 @@ _start:
     ;IDK, some kernel recovery stuff
     ;xor esi, esi
     ;xor edi, edi
-    add esp, 0x2c           ; Fix stack alignment
+    pop eax
+    add esp, 0x28           ; Fix stack alignment
+    pop ebp
+    push eax
+    ;mov eax, [esp-0x10]
+    ;push eax
     ;sub esp, 0x4
     ;mov edx, 0x00010002     ; Idk, looks cool
-    mov ebx, 0x00000103     ; Idk, looks cool
-    mov edx, [esp+0xf4]
-    shr edx, 0x4
+    ;mov ebx, 0x00000103     ; Idk, looks cool
+    ;mov edx, [esp+0xf4]
+    ;shr edx, 0x4
     xor eax, eax            ; set NTSTATUS SUCCESS
     mov ecx, eax
     mov eax, ecx
     ;mov ebp, esp
     ;add ebp, 0xc
-    pop ebp                 ; restore stack base
+    ;pop ebp                 ; restore stack base
     ret 8                   ; clean return
